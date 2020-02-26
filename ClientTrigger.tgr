@@ -1,0 +1,29 @@
+/////////////////////////////////////////////////////////////////////////////////
+//Trigger On client this is fired on insert and Update to populate client score
+/////////////////////////////////////////////////////////////////////////////////
+
+trigger ClientTrigger on Client__c (after insert,after update) {
+    
+    if (trigger.isAfter && trigger.isInsert) {
+        //////////////////////////////////////////////////////////////////////
+        //As API support single record Operation so the code is not bulkified
+        //////////////////////////////////////////////////////////////////////
+        Client__c client = Trigger.new[0];
+        if((client.Program_Name__c != null || client.Prospect_UUID__c != null) && (client.Program_Created_Dt__c != null || client.Prospect_Created_Dt__c != null) && client.Credit_Score__c != null && client.Date_Of_Birth__c != null && client.Gender__c != null && client.Home_Status__c != null && client.Monthly_Expenses__c != null && client.Original_Debt_Enrolled__c != null && client.Payment_Frequency__c != null && client.Total_Monthly_Income__c != null){
+            ClientTriggerHandler.callout(client);
+        }
+    }
+    
+    if (trigger.isAfter && trigger.isUpdate && ClientTriggerHandler.checkRecursive) {
+         //////////////////////////////////////////////////////////////////////
+        //As API support single record Operation so the code is not bulkified
+        //////////////////////////////////////////////////////////////////////
+        Client__c newClient = Trigger.new[0];
+        Client__c oldClient = Trigger.Old[0];
+        if((newClient.Program_Name__c != null || newClient.Prospect_UUID__c != null) && (newClient.Program_Created_Dt__c != null || newClient.Prospect_Created_Dt__c != null) && newClient.Credit_Score__c != null && newClient.Date_Of_Birth__c != null && newClient.Gender__c != null && newClient.Home_Status__c != null && newClient.Monthly_Expenses__c != null && newClient.Original_Debt_Enrolled__c != null && newClient.Payment_Frequency__c != null && newClient.Total_Monthly_Income__c != null){
+            if(newClient.Program_Name__c != oldClient.Program_Name__c || newClient.Prospect_UUID__c != oldClient.Prospect_UUID__c || newClient.Program_Created_Dt__c != oldClient.Prospect_Created_Dt__c || newClient.Prospect_Created_Dt__c != oldClient.Prospect_Created_Dt__c || newClient.Credit_Score__c != oldClient.Credit_Score__c || newClient.Date_Of_Birth__c != oldClient.Date_Of_Birth__c || newClient.Gender__c != oldClient.Gender__c || newClient.Home_Status__c != oldClient.Home_Status__c || newClient.Monthly_Expenses__c != oldClient.Monthly_Expenses__c || newClient.Original_Debt_Enrolled__c != oldClient.Original_Debt_Enrolled__c || newClient.Payment_Frequency__c != oldClient.Payment_Frequency__c || newClient.Total_Monthly_Income__c != oldClient.Total_Monthly_Income__c){
+                ClientTriggerHandler.callout(newClient);
+            }
+        }
+    }
+}
