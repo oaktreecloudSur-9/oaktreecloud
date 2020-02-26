@@ -1,0 +1,170 @@
+trigger MailofContactTrigger on Contact (before update,after insert) {
+    if(ContactTriggerFlag.isContactBatchRunning != true)  {
+    List<Contact> contactList = Trigger.isInsert?Trigger.new:Trigger.old;
+    Map<id,Contact> contactMap = Trigger.newMap;
+    List<Mail_Address__c> mailAddress = new List<Mail_Address__c>();
+    List<Contact> contactToUpdate = new List<Contact>();
+    
+    List<ContactOld_Email__c> lstContactOldEmail = new List<ContactOld_Email__c>();
+    List<ContactOld_Phone__c> lstContactOldPhone = new List<ContactOld_Phone__c>();
+    ContactOld_Email__c cntctOldEmail;
+    ContactOld_Phone__c cntctOldPhone;
+    
+    Mail_Address__c oldMail;
+    
+    List<Id> contactIdList = new List<Id>();
+    for(Contact contact : contactList){
+        contactIdList.add(contact.id);
+    }
+    
+    List<Mail_Address__c> mailFromDbList = [SELECT Last_Mail_Modified_Date__c,Last_Mail__c,Contact__c FROM Mail_Address__c WHERE Contact__c IN : contactIdList];
+    
+    List<ContactOld_Email__c> lstContactOldEmails = [Select id, Contact__c, Last_Email__c, Email_Type__c from ContactOld_Email__c where Contact__c IN :contactIdList ]; 
+    
+    List<ContactOld_Phone__c> lstContactOldPhones = [Select id, Contact__c, Last_Phone__c, Phone__c from ContactOld_Phone__c where Contact__c IN :contactIdList];
+    
+    Map<id,Map<String,String>> contactEmailMap = new Map<id,Map<String,String>>();
+    
+    Map<id,Map<String,String>> contactPhoneMap = new Map<id,Map<String,String>>();
+    
+    Map<id,Map<String,String>> contactMailMap = new Map<id,Map<String,String>>();
+    
+    for(Mail_Address__c oldMailFromDb : mailFromDbList){
+        if(!contactMailMap.containsKey(oldMailFromDb.Contact__c)){
+            contactMailMap.put(oldMailFromDb.Contact__c, new Map<String,String>());
+        }
+        contactMailMap.get(oldMailFromDb.Contact__c).put(oldMailFromDb.Last_Mail__C,oldMailFromDb.id);
+    }
+    
+    for(ContactOld_Email__c cont : lstContactOldEmails){
+        if(!contactEmailMap.containsKey(cont.Contact__c)){
+            contactEmailMap.put(cont.Contact__c, new Map<String,String>());
+        }
+        contactEmailMap.get(cont.Contact__c).put(cont.Last_Email__c,cont.Id);
+    }
+    
+    for(ContactOld_Phone__c cont : lstContactOldPhones){
+        if(!contactPhoneMap.containsKey(cont.Contact__c)){
+            contactPhoneMap.put(cont.Contact__c, new Map<String,String>());
+        }
+        contactPhoneMap.get(cont.Contact__c).put(cont.Last_Phone__c,cont.Id);
+    }
+    
+    for(Contact cnt : contactList){
+        Contact contact2 = new Contact(id=cnt.id);
+        System.debug(contactMap.get(cnt.id).MailingCountry);
+        System.debug(cnt.MailingCountry);
+        if((contactMap.get(cnt.id).MailingCountry!= null && (Trigger.isInsert ||  contactMap.get(cnt.id).MailingCountry!=cnt.MailingCountry)) || (contactMap.get(cnt.id).MailingState!= null && (Trigger.isInsert || contactMap.get(cnt.id).MailingState!=cnt.MailingState)) || (contactMap.get(cnt.id).MailingStreet!= null  && (Trigger.isInsert || contactMap.get(cnt.id).MailingStreet!=cnt.MailingStreet)) || (contactMap.get(cnt.id).MailingCity!= null && (Trigger.isInsert || contactMap.get(cnt.id).MailingCity!=cnt.MailingCity)) || (contactMap.get(cnt.id).MailingPostalCode!= null && (Trigger.isInsert || contactMap.get(cnt.id).MailingPostalCode!=cnt.MailingPostalCode))) {
+            oldMail = new Mail_Address__c();  
+            oldMail.Last_Mail__c = String.valueOf(contactMap.get(cnt.id).MailingStreet) + ', ' + String.valueOf(contactMap.get(cnt.id).MailingCity) + ', ' + String.valueOf(contactMap.get(cnt.id).MailingState) + ', ' + String.valueOf(contactMap.get(cnt.id).MailingCountry) + ' - ' + String.valueOf(contactMap.get(cnt.id).MailingPostalCode);
+            if(contactMailMap.get(cnt.id)!= null && contactMailMap.get(cnt.id).containsKey(oldMail.Last_Mail__c))  {
+                oldMail.id = contactMailMap.get(cnt.id).get(oldMail.Last_Mail__c);
+            }  
+            oldMail.Contact__c = cnt.id;
+            oldMail.Name = cnt.FirstName+' '+cnt.LastName;
+            oldMail.Last_Mail_Modified_Date__c = Datetime.now();
+            oldMail.Address_type__c = 'Mailing Address';
+            if(Trigger.isInsert) {
+                contact2.Last_Mail_Modified_Date__c=oldMail.Last_Mail_Modified_Date__c;
+            }else{
+                contactMap.get(cnt.id).Last_Mail_Modified_Date__c = oldMail.Last_Mail_Modified_Date__c;                
+            } 
+            mailAddress.add(oldMail);     
+        }
+        contactToUpdate.add(contact2);
+        
+        if(contactMap.get(cnt.id).Email != null && ( Trigger.isInsert || contactMap.get(cnt.id).Email != cnt.Email)){
+            cntctOldEmail = new ContactOld_Email__c (); 
+            cntctOldEmail.Last_Email__c = contactMap.get(cnt.id).Email;
+            if(contactEmailMap.get(cnt.id)!= null && contactEmailMap.get(cnt.id).containsKey(cntctOldEmail.Last_Email__c)){
+                cntctOldEmail.id = contactEmailMap.get(cnt.id).get(cntctOldEmail.Last_Email__c);
+            }
+            
+            cntctOldEmail.Contact__c = cnt.id;
+            cntctOldEmail.Name = cnt.FirstName +' '+ cnt.LastName;
+            cntctOldEmail.Email_Type__c = 'Email';
+            lstContactOldEmail.add(cntctOldEmail);
+        }
+        
+        if(contactMap.get(cnt.id).Email_2__c != null && ( Trigger.isInsert || contactMap.get(cnt.id).Email_2__c != cnt.Email_2__c)){
+            cntctOldEmail = new ContactOld_Email__c (); 
+            cntctOldEmail.Last_Email__c = contactMap.get(cnt.id).Email_2__c;
+            if(contactEmailMap.get(cnt.id)!= null && contactEmailMap.get(cnt.id).containsKey(cntctOldEmail.Last_Email__c)){
+                cntctOldEmail.id = contactEmailMap.get(cnt.id).get(cntctOldEmail.Last_Email__c);
+            }
+            
+            cntctOldEmail.Contact__c = cnt.id;
+            cntctOldEmail.Name = cnt.FirstName +' '+ cnt.LastName;
+            cntctOldEmail.Email_Type__c = 'Email 2';
+            lstContactOldEmail.add(cntctOldEmail);
+        }
+        
+        if(contactMap.get(cnt.id).Email_3__c != null && ( Trigger.isInsert || contactMap.get(cnt.id).Email_3__c != cnt.Email_3__c)){
+            cntctOldEmail = new ContactOld_Email__c (); 
+            cntctOldEmail.Last_Email__c = contactMap.get(cnt.id).Email_3__c;
+            if(contactEmailMap.get(cnt.id)!= null && contactEmailMap.get(cnt.id).containsKey(cntctOldEmail.Last_Email__c)){
+                cntctOldEmail.id = contactEmailMap.get(cnt.id).get(cntctOldEmail.Last_Email__c);
+            }
+            
+            cntctOldEmail.Contact__c = cnt.id;
+            cntctOldEmail.Name = cnt.FirstName +' '+ cnt.LastName;  
+            cntctOldEmail.Email_Type__c = 'Email 3';
+            
+            lstContactOldEmail.add(cntctOldEmail);
+        } 
+        
+        if(contactMap.get(cnt.id).Phone != null && ( Trigger.isInsert || contactMap.get(cnt.id).Phone != cnt.Phone)){
+            cntctOldPhone = new ContactOld_Phone__c (); 
+            cntctOldPhone.Last_Phone__c = contactMap.get(cnt.id).Phone;
+            if(contactPhoneMap.get(cnt.id)!= null && contactPhoneMap.get(cnt.id).containsKey(cntctOldPhone.Last_Phone__c)){
+                cntctOldPhone.id = contactPhoneMap.get(cnt.id).get(cntctOldPhone.Last_Phone__c);
+            }
+            
+            cntctOldPhone.Contact__c = cnt.id;
+            cntctOldPhone.Name = cnt.FirstName +' '+ cnt.LastName;  
+            cntctOldPhone.Phone__c = 'Phone';
+            
+            lstContactOldPhone.add(cntctOldPhone);
+        }
+        
+        if(contactMap.get(cnt.id).MobilePhone != null && ( Trigger.isInsert || contactMap.get(cnt.id).MobilePhone != cnt.MobilePhone)){
+            cntctOldPhone = new ContactOld_Phone__c (); 
+            cntctOldPhone.Last_Phone__c = contactMap.get(cnt.id).MobilePhone;
+            if(contactPhoneMap.get(cnt.id)!= null && contactPhoneMap.get(cnt.id).containsKey(cntctOldPhone.Last_Phone__c)){
+                cntctOldPhone.id = contactPhoneMap.get(cnt.id).get(cntctOldPhone.Last_Phone__c);
+            }
+            
+            cntctOldPhone.Contact__c = cnt.id;
+            cntctOldPhone.Name = cnt.FirstName +' '+ cnt.LastName;  
+            cntctOldPhone.Phone__c = 'Mobile';
+            
+            lstContactOldPhone.add(cntctOldPhone);
+        }
+        
+        if(contactMap.get(cnt.id).OtherPhone != null && ( Trigger.isInsert || contactMap.get(cnt.id).OtherPhone != cnt.OtherPhone)){
+            cntctOldPhone = new ContactOld_Phone__c (); 
+            cntctOldPhone.Last_Phone__c = contactMap.get(cnt.id).OtherPhone;
+            if(contactPhoneMap.get(cnt.id)!= null && contactPhoneMap.get(cnt.id).containsKey(cntctOldPhone.Last_Phone__c)){
+                cntctOldPhone.id = contactPhoneMap.get(cnt.id).get(cntctOldPhone.Last_Phone__c);
+            }
+            
+            cntctOldPhone.Contact__c = cnt.id;
+            cntctOldPhone.Name = cnt.FirstName +' '+ cnt.LastName;  
+            cntctOldPhone.Phone__c = 'Other Phone';
+            lstContactOldPhone.add(cntctOldPhone);
+        } 
+        
+    }
+    System.debug(mailAddress.size());
+    upsert mailAddress;
+    upsert lstContactOldEmail;
+    upsert lstContactOldPhone;
+    
+    if (!StopRecursiveTrigger.isTriggerContactExecuted && Trigger.isInsert){
+        StopRecursiveTrigger.isTriggerContactExecuted = true;
+        if(contactToUpdate.size()>0) {
+            update contactToUpdate;
+        }           
+    }
+    }
+    }
